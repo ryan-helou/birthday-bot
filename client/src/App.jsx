@@ -89,19 +89,24 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-xl px-5 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-7">
+    <div className="flex h-[100dvh] flex-col bg-ground">
+      {/* Only this middle region scrolls. The bar below is a normal-flow sibling,
+          so it cannot resolve against a viewport that disagrees with the screen —
+          the failure mode `position: fixed` has in an installed iOS web app. */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+        <div className="mx-auto w-full max-w-xl px-5 pb-8 pt-6 sm:px-7">
       <header className="flex items-baseline justify-between gap-4">
         <h1 className="font-display text-[26px] leading-none tracking-tight">Birthdays</h1>
         <div className="flex items-center gap-3">
           <span className="text-[13px] tabular-nums text-faint">{contacts.length}</span>
           <button
             onClick={() => setDialog("notifications")}
-            className="relative -mr-1.5 rounded-full p-1.5 text-muted transition hover:text-ink"
+            className="relative -mr-2 grid size-11 place-items-center rounded-full text-muted transition active:bg-line/60 sm:size-9 sm:hover:text-ink"
             aria-label="Notification settings"
           >
             <Icon name={pushOn ? "bell" : "bellOff"} className="size-[18px]" />
             {pushOn ? (
-              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-accent" />
+              <span className="absolute right-2 top-2 size-1.5 rounded-full bg-accent sm:right-1 sm:top-1" />
             ) : null}
           </button>
         </div>
@@ -163,7 +168,7 @@ export default function App() {
         </div>
       ) : null}
 
-      <main className="pb-8">
+      <main>
         {loading ? (
           <p className="py-16 text-center text-sm text-faint">Loading…</p>
         ) : contacts.length === 0 ? (
@@ -204,10 +209,14 @@ export default function App() {
         )}
       </main>
 
-      {/* Fixed, not sticky: inside an installed web app a sticky bar can fail to
-          resolve its containing block and strand itself mid-screen. No blur —
-          a blurred fixed bar detaches during iOS momentum scrolling. */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
+        </div>
+      </div>
+
+      {/* In normal flow, not fixed and not sticky: it is the last shrink-0 child
+          of a definite-height column, so it physically cannot float. Being
+          outside the scroll container it also can't repaint at a stale position
+          during momentum scrolling. No backdrop blur — that detaches on iOS. */}
+      <nav className="shrink-0 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-xl items-center gap-2 px-5 py-3 sm:px-7">
           <Button variant="accent" icon="plus" onClick={() => { setEditing(null); setDialog("add"); }}>
             Add

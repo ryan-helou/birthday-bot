@@ -45,17 +45,17 @@ export function ContactRow({ contact, onEdit, onDelete }) {
       </span>
 
       {/* Controls stay out of the way until the row is touched or focused. */}
-      <span className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 max-sm:opacity-100">
+      <span className="-mr-1.5 flex shrink-0 items-center sm:opacity-0 sm:transition-opacity sm:focus-within:opacity-100 sm:group-hover:opacity-100">
         <button
           onClick={() => onEdit(contact)}
-          className="rounded-md p-1.5 text-faint hover:text-ink"
+          className="grid size-10 place-items-center rounded-lg text-faint active:bg-line/60 sm:size-9 sm:hover:text-ink"
           aria-label={`Edit ${contact.name}`}
         >
           <Icon name="pencil" className="size-4" />
         </button>
         <button
           onClick={() => onDelete(contact)}
-          className="rounded-md p-1.5 text-faint hover:text-accent"
+          className="grid size-10 place-items-center rounded-lg text-faint active:bg-line/60 sm:size-9 sm:hover:text-accent"
           aria-label={`Remove ${contact.name}`}
         >
           <Icon name="trash" className="size-4" />

@@ -9,7 +9,7 @@ export function Button({ variant = "accent", icon, children, className = "", ...
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[14px] font-medium transition disabled:cursor-not-allowed disabled:opacity-45 ${styles} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-[15px] font-medium transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 ${styles} ${className}`}
       {...rest}
     >
       {icon ? <Icon name={icon} className="size-4" /> : null}
@@ -69,11 +69,11 @@ export function Modal({ title, onClose, children }) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-line bg-surface p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:rounded-2xl sm:pb-6"
+        className="relative max-h-[88dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-line bg-surface p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:rounded-2xl sm:pb-6"
       >
         <div className="mb-5 flex items-baseline justify-between gap-4">
           <h2 className="font-display text-[22px] leading-none tracking-tight">{title}</h2>
-          <button onClick={onClose} className="-mr-1 rounded-md p-1.5 text-faint hover:text-ink" aria-label="Close">
+          <button onClick={onClose} className="-mr-2 grid size-10 place-items-center rounded-lg text-faint active:bg-line/60 sm:hover:text-ink" aria-label="Close">
             <Icon name="close" className="size-[18px]" />
           </button>
         </div>
