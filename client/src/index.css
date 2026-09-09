@@ -46,24 +46,44 @@ html {
   background-color: var(--color-ground);
   color-scheme: light dark;
   -webkit-text-size-adjust: 100%;
+  height: 100%;
 }
 
 body {
   margin: 0;
+  height: 100%;
   background-color: var(--color-ground);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
-  /* The action bar is fixed, so the page needs room beneath it. */
-  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  /* The shell owns the height and the action bar sits in normal flow, so the
+     body itself never scrolls — no rubber-band revealing the host behind it. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
-@media (min-width: 768px) {
-  body { padding-bottom: 2rem; }
+button, a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-button, a { -webkit-tap-highlight-color: transparent; }
+/* A long press on a control should act, not offer to copy or share it. */
+button, nav, .no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/*
+ * iOS zooms the whole page when a focused field is under 16px, and never zooms
+ * back out. Every input, select and textarea therefore sets 16px explicitly —
+ * this is the correct fix; blocking zoom with maximum-scale breaks pinch-zoom
+ * for everyone.
+ */
+input, select, textarea {
+  font-size: 16px;
+}
 
 :focus-visible {
   outline: 2px solid var(--color-accent);

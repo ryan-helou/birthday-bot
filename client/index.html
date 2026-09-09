@@ -2,8 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- viewport-fit=cover so the installed iOS app can paint into the safe areas -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!--
+      Deliberately NO viewport-fit=cover.
+
+      In an installed iOS Home Screen app, `cover` anchors the web view at the top
+      of the display but does not give it the display's HEIGHT: the viewport ends
+      one status-bar short, leaving a black band under the bottom bar that no CSS
+      can paint. Without `cover`, iOS sizes the web view to the safe area and
+      fills the surrounding region by extending the page's own edge colour, so the
+      bar visually reaches the screen edge. Measured on an iPhone 14 — and a
+      Safari tab cannot reproduce it, only a Home Screen install can.
+
+      maximum-scale is NOT set: it would block pinch-zoom, which people rely on.
+      Input zoom-on-focus is prevented the correct way instead, by keeping every
+      field at 16px.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Birthday Bot</title>
     <meta name="description" content="Every birthday you care about, with a reminder at 8:00 AM on the day." />
 
@@ -20,6 +34,8 @@
          not cover iOS on its own. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <!-- Not the lever for the dead band (black and black-translucent both measured
+         identical); "default" keeps the status bar legible on the light ground. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Birthdays" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
