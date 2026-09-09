@@ -1,0 +1,74 @@
+// Birthday Bot — PostgreSQL schema (Railway-friendly).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Contact {
+  id   String @id @default(cuid())
+  name String
+
+  /// The full birthdate, stored as a DATE (no time, no zone).
+  /// When the source only gave us a month/day (Snapchat's birthday list does
+  /// exactly that), `yearKnown` is false and the year here is a placeholder —
+  /// read the year ONLY through `server/lib/dates.js#ageTurningOn`.
+  birthdate DateTime @db.Date
+
+  /// Denormalised so the 8am job is a single indexed equality lookup and never
+  /// has to do date maths in whatever timezone the database session happens to
+  /// be in. Kept in sync by `contactFieldsFromInput`.
+  birthMonth Int
+  birthDay   Int
+
+  /// False when the birth year is unknown — the reminder then omits the age.
+  yearKnown Boolean @default(true)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, birthMonth, birthDay], name: "contact_identity")
+  @@index([birthMonth, birthDay])
+}
+
+model Subscription {
+  id String @id @default(cuid())
+
+  /// The push service URL. Unique — re-subscribing the same browser must not
+  /// create a duplicate device (and duplicate notifications).
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  userAgent String?
+  label     String?
+
+  /// Consecutive delivery failures. A 404/410 deletes the row outright; other
+  /// errors increment this so a permanently broken endpoint can be pruned.
+  failureCount Int @default(0)
+
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+}
+
+/// One row per day the birthday job has completed, so a container restart (or a
+/// second instance) cannot send the same reminders twice — and so a process that
+/// was asleep at 08:00 can catch up when it boots.
+model NotificationRun {
+  id String @id @default(cuid())
+
+  /// yyyy-mm-dd in APP_TIMEZONE. A string, not a DateTime, so no timezone can
+  /// ever reinterpret it. See brain memory: railway-runs-utc-set-tz.
+  runDate String @unique
+
+  birthdayCount Int      @default(0)
+  sentCount     Int      @default(0)
+  failedCount   Int      @default(0)
+  trigger       String   @default("cron")
+  createdAt     DateTime @default(now())
+}
