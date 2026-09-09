@@ -8,10 +8,10 @@ export const monthDay = (contact) => `${MONTHS[contact.birthMonth - 1]} ${contac
 export function countdown(days) {
   if (days === 0) return "Today";
   if (days === 1) return "Tomorrow";
-  if (days < 7) return `In ${days} days`;
-  if (days < 14) return "Next week";
-  if (days < 60) return `In ${days} days`;
-  return `In ${Math.round(days / 30)} months`;
+  if (days < 14) return `${days} days`;
+  if (days < 60) return `${Math.round(days / 7)} weeks`;
+  if (days < 330) return `${Math.round(days / 30)} months`;
+  return "next year";
 }
 
 export function turningLabel(contact) {

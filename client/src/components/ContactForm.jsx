@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Field, Modal, inputClass } from "./ui.jsx";
+import { Button, Field, Modal, fieldClass } from "./ui.jsx";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -63,7 +63,7 @@ export function ContactForm({ contact, onSubmit, onClose }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Name">
           <input
-            className={inputClass}
+            className={fieldClass}
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Ava Bennett"
@@ -75,18 +75,18 @@ export function ContactForm({ contact, onSubmit, onClose }) {
         <div>
           <span className="mb-1.5 block text-sm font-medium text-ink">Birthday</span>
           <div className="grid grid-cols-[1.4fr_0.8fr_1fr] gap-2">
-            <select className={inputClass} value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month">
+            <select className={fieldClass} value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month">
               {MONTHS.map((label, index) => (
                 <option key={label} value={index + 1}>{label}</option>
               ))}
             </select>
-            <select className={inputClass} value={day} onChange={(e) => setDay(e.target.value)} aria-label="Day">
+            <select className={fieldClass} value={day} onChange={(e) => setDay(e.target.value)} aria-label="Day">
               {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((value) => (
                 <option key={value} value={value}>{value}</option>
               ))}
             </select>
             <input
-              className={inputClass}
+              className={fieldClass}
               value={year}
               onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
               placeholder="Year"
@@ -101,7 +101,7 @@ export function ContactForm({ contact, onSubmit, onClose }) {
 
         <Field label="Notes" hint="Optional. Gift ideas, how you know them, anything.">
           <textarea
-            className={`${inputClass} min-h-20 resize-y`}
+            className={`${fieldClass} min-h-20 resize-y`}
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Loves cold-brew. Met at camp."
