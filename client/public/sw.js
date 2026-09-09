@@ -53,6 +53,27 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  /*
+   * The contact list is network-first with a cached fallback, so opening the app
+   * with no signal shows the last known birthdays instead of an error. Every
+   * other API path stays live — a stale write or a stale push key is worse than
+   * a failure you can see.
+   */
+  if (url.pathname === "/api/contacts") {
+    event.respondWith(
+      (async () => {
+        try {
+          const fresh = await fetch(request);
+          stash(request, fresh);
+          return fresh;
+        } catch {
+          const cached = await safeMatch(request);
+          return cached ?? Response.error();
+        }
+      })(),
+    );
+    return;
+  }
   if (url.pathname.startsWith("/api/")) return; // always live
 
   const isNavigation = request.mode === "navigate";

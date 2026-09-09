@@ -10,6 +10,7 @@ import { contactsRouter } from "./routes/contacts.js";
 import { subscriptionsRouter } from "./routes/subscriptions.js";
 import { importRouter } from "./routes/import.js";
 import { systemRouter } from "./routes/system.js";
+import { passcodeGate, sessionRoutes } from "./auth.js";
 import { scheduleBirthdayJob } from "./jobs/birthday-job.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,9 @@ export function createApp() {
   // The PWA is served from this same origin in production, so CORS only matters
   // for the Vite dev server on :5173.
   if (!env.isProduction) app.use(cors());
+
+  sessionRoutes(app);
+  app.use(passcodeGate);
 
   app.use("/api", systemRouter);
   app.use("/api/contacts", contactsRouter);

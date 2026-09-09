@@ -9,6 +9,7 @@ import { YearMeridian } from "./components/YearMeridian.jsx";
 import { ContactForm } from "./components/ContactForm.jsx";
 import { ImportPanel } from "./components/ImportPanel.jsx";
 import { NotificationSettings } from "./components/NotificationSettings.jsx";
+import { Passcode } from "./components/Passcode.jsx";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -24,6 +25,7 @@ export default function App() {
   const [dialog, setDialog] = useState(null);
   const [editing, setEditing] = useState(null);
   const [pushOn, setPushOn] = useState(false);
+  const [locked, setLocked] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -32,13 +34,26 @@ export default function App() {
       setToday(data.today);
       setError(null);
     } catch (loadError) {
-      setError(loadError.message);
+      // 401 only happens when the server is running with APP_PASSCODE set.
+      if (/locked/i.test(loadError.message)) setLocked(true);
+      else setError(loadError.message);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  /* A birthday notification links to ?contact=<id>. Opening it should land on
+     that person, not on the list — the payload has always promised this. */
+  useEffect(() => {
+    if (loading || contacts.length === 0) return;
+    const wanted = new URLSearchParams(window.location.search).get("contact");
+    if (!wanted) return;
+    const match = contacts.find((c) => c.id === wanted);
+    if (match) { setEditing(match); setDialog("edit"); }
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [loading, contacts]);
   useEffect(() => { getExistingSubscription().then((s) => setPushOn(Boolean(s))).catch(() => {}); }, [dialog]);
 
   const filtered = useMemo(() => {
@@ -82,10 +97,22 @@ export default function App() {
   const next = contacts[0];
   const todaysPeople = contacts.filter((c) => c.daysUntil === 0);
 
+  /* Anyone whose day fell in the last week. They are ~360 days "away" and would
+     otherwise sit at the very bottom of the year, which is exactly where you
+     would not look to check whether you missed someone. */
+  const justPassed = useMemo(
+    () => contacts.filter((c) => c.daysUntil >= 358).sort((a, b) => b.daysUntil - a.daysUntil),
+    [contacts],
+  );
+
   async function handleDelete(contact) {
     if (!window.confirm(`Remove ${contact.name}?`)) return;
     await api.deleteContact(contact.id);
     await load();
+  }
+
+  if (locked) {
+    return <Passcode onUnlocked={() => { setLocked(false); setLoading(true); load(); }} />;
   }
 
   return (
@@ -181,8 +208,31 @@ export default function App() {
           </EmptyState>
         ) : (
           <div>
+            {!query && justPassed.length > 0 ? (
+              <section className="mt-2">
+                <div className="flex items-baseline gap-3">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                    Just passed
+                  </h2>
+                  <span className="h-px flex-1 bg-line" />
+                  <span className="text-[11px] tabular-nums text-faint">{justPassed.length}</span>
+                </div>
+                <ul className="mt-1 divide-y divide-line">
+                  {justPassed.map((contact) => (
+                    <ContactRow
+                      key={`passed-${contact.id}`}
+                      contact={contact}
+                      passed={365 - contact.daysUntil}
+                      onEdit={(t) => { setEditing(t); setDialog("edit"); }}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
             {months.map(({ key, month, year, contacts: list }) => (
-              <section key={key} className="mt-7 first:mt-2">
+              <section key={key} className={justPassed.length && !query ? "mt-7" : "mt-7 first:mt-2"}>
                 <div className="flex items-baseline gap-3">
                   <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
                     {MONTHS[month - 1]}

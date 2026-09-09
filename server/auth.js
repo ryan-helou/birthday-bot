@@ -1,0 +1,91 @@
+import crypto from "node:crypto";
+import { currentPasscode, env } from "./env.js";
+
+/**
+ * Optional passcode gate.
+ *
+ * OFF unless APP_PASSCODE is set, so an existing deployment keeps working
+ * exactly as before. Set the variable and the whole app — API and page — is
+ * behind one passcode, entered once per device.
+ *
+ * The cookie is an HMAC of its own expiry under a key derived from the
+ * passcode, so there is no session store to keep and changing the passcode
+ * invalidates every device at once.
+ */
+const COOKIE = "bb_session";
+const MAX_AGE_DAYS = 180;
+
+const key = () =>
+  crypto.createHash("sha256").update(`birthday-bot:${currentPasscode()}`).digest();
+
+function sign(expiresAt) {
+  const mac = crypto.createHmac("sha256", key()).update(String(expiresAt)).digest("base64url");
+  return `${expiresAt}.${mac}`;
+}
+
+function verify(token) {
+  if (typeof token !== "string") return false;
+  const [expiresRaw, mac] = token.split(".");
+  const expiresAt = Number(expiresRaw);
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
+  const expected = crypto.createHmac("sha256", key()).update(expiresRaw).digest("base64url");
+  const a = Buffer.from(mac ?? "", "utf8");
+  const b = Buffer.from(expected, "utf8");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function readCookie(req) {
+  const raw = req.headers.cookie;
+  if (!raw) return undefined;
+  for (const part of raw.split(";")) {
+    const [name, ...rest] = part.trim().split("=");
+    if (name === COOKIE) return decodeURIComponent(rest.join("="));
+  }
+  return undefined;
+}
+
+/** Public routes: the health check, and the passcode exchange itself. */
+const OPEN = new Set(["/api/health", "/api/session"]);
+
+export function passcodeGate(req, res, next) {
+  if (!currentPasscode()) return next();
+  if (OPEN.has(req.path)) return next();
+  if (verify(readCookie(req))) return next();
+
+  if (req.path.startsWith("/api/")) {
+    return res.status(401).json({ error: "This Birthday Bot is locked. Enter the passcode." });
+  }
+  // Let the page load; the client asks for a passcode when the API says 401.
+  return next();
+}
+
+export function sessionRoutes(app) {
+  app.get("/api/session", (req, res) => {
+    const passcode = currentPasscode();
+    res.json({ required: Boolean(passcode), signedIn: !passcode || verify(readCookie(req)) });
+  });
+
+  app.post("/api/session", (req, res) => {
+    const passcode = currentPasscode();
+    if (!passcode) return res.json({ signedIn: true });
+
+    const given = String(req.body?.passcode ?? "");
+    const a = Buffer.from(given, "utf8");
+    const b = Buffer.from(passcode, "utf8");
+    const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+    if (!ok) return res.status(401).json({ error: "That passcode doesn't match." });
+
+    const expiresAt = Date.now() + MAX_AGE_DAYS * 86400_000;
+    res.setHeader(
+      "Set-Cookie",
+      `${COOKIE}=${encodeURIComponent(sign(expiresAt))}; Path=/; HttpOnly; SameSite=Lax; ` +
+        `Max-Age=${MAX_AGE_DAYS * 86400}${env.isProduction ? "; Secure" : ""}`,
+    );
+    res.json({ signedIn: true });
+  });
+
+  app.delete("/api/session", (req, res) => {
+    res.setHeader("Set-Cookie", `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+    res.status(204).end();
+  });
+}
