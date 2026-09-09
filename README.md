@@ -37,9 +37,28 @@ npm run build && npm start
 
 ## Deploying to Railway
 
+**It's already deployed:** https://birthday-bot-production-9d98.up.railway.app
+(project `birthday-bot`, service `birthday-bot`, plus a `Postgres` service).
+
+Infrastructure is declared in `.railway/railway.ts` — Railway's Infrastructure as
+Code. The older `railway.json` was removed: it is deprecated (unread after
+2026-12-01) and, as `railway config plan` showed, it was **never actually applied**
+to this service — the build only worked because Railpack auto-detects `npm run build`
+and `npm start` from `package.json`.
+
+Authoring the config needs the SDK and **Node 22+** (the evaluator uses
+`--experimental-strip-types`, which Node 20 does not have):
+
+```bash
+nvm use 22
+railway config plan     # preview
+railway config apply    # write it to Railway
+```
+
+### From scratch
+
 1. **Create the project** and add a **PostgreSQL** service.
-2. **Add this repo** as a second service. Railway reads `railway.json` /
-   `nixpacks.toml`, so it builds with `npm run build` and starts with `npm start`.
+2. **Add this repo** as a service. Pushing to `main` redeploys automatically.
 3. **Set the variables** on the app service:
 
    | Variable | Value |
@@ -50,13 +69,20 @@ npm run build && npm start
    | `VAPID_SUBJECT` | `mailto:you@example.com` |
    | `APP_TIMEZONE` | `America/Toronto` (the zone 8:00 AM means) |
    | `NOTIFY_HOUR` | `8` (optional) |
+   | `TZ` | `America/Toronto` (optional — the app derives the day itself) |
 
-   Don't set `PORT` — Railway injects it, and the server binds it.
-4. **Generate a domain.** Web Push requires HTTPS; Railway's domain provides it.
+   Don't set `PORT`; Railway injects it and the server binds it.
+4. **Generate a domain.** Web Push requires HTTPS, which the Railway domain provides.
 
-`npm start` runs `prisma migrate deploy` before booting, so a deploy applies
-migrations itself. The health check is `GET /api/health`, which returns 503 while
-Postgres is unreachable so a broken container doesn't take traffic.
+Verify the variables actually landed rather than trusting the command:
+
+```bash
+railway variables --service birthday-bot --kv
+```
+
+`npm start` runs `prisma migrate deploy` before booting, so a deploy applies its own
+migrations. The health check is `GET /api/health`, which returns 503 while Postgres is
+unreachable so a broken container doesn't take traffic.
 
 ### Install it on a phone
 
@@ -113,6 +139,7 @@ version is an `Authorization` check in one middleware in `server/index.js`.
 ## Layout
 
 ```
+.railway/railway.ts         Railway infrastructure as code
 prisma/schema.prisma        Contact · Subscription · NotificationRun
 prisma.config.mjs           Prisma 7 config (the DB url lives here, not in the schema)
 server/
