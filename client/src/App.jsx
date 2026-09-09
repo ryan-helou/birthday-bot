@@ -1,20 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./lib/api.js";
 import { getExistingSubscription } from "./lib/push.js";
-import { countdown, groupByHorizon, monthDay, turningLabel } from "./lib/format.js";
+import { countdown, monthDay } from "./lib/format.js";
 import { Icon } from "./components/Icon.jsx";
 import { Banner, Button, EmptyState, inputClass } from "./components/ui.jsx";
-import { ContactCard } from "./components/ContactCard.jsx";
+import { ContactRow } from "./components/ContactRow.jsx";
+import { YearMeridian } from "./components/YearMeridian.jsx";
 import { ContactForm } from "./components/ContactForm.jsx";
 import { ImportPanel } from "./components/ImportPanel.jsx";
 import { NotificationSettings } from "./components/NotificationSettings.jsx";
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 export default function App() {
   const [contacts, setContacts] = useState([]);
+  const [today, setToday] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState("");
-  const [dialog, setDialog] = useState(null); // "add" | "import" | "notifications"
+  const [dialog, setDialog] = useState(null);
   const [editing, setEditing] = useState(null);
   const [pushOn, setPushOn] = useState(false);
 
@@ -22,6 +29,7 @@ export default function App() {
     try {
       const data = await api.listContacts();
       setContacts(data.contacts);
+      setToday(data.today);
       setError(null);
     } catch (loadError) {
       setError(loadError.message);
@@ -37,16 +45,42 @@ export default function App() {
     const needle = query.trim().toLowerCase();
     if (!needle) return contacts;
     return contacts.filter(
-      (contact) =>
-        contact.name.toLowerCase().includes(needle) ||
-        monthDay(contact).toLowerCase().includes(needle) ||
-        (contact.notes ?? "").toLowerCase().includes(needle),
+      (c) =>
+        c.name.toLowerCase().includes(needle) ||
+        monthDay(c).toLowerCase().includes(needle) ||
+        (c.notes ?? "").toLowerCase().includes(needle),
     );
   }, [contacts, query]);
 
-  const groups = useMemo(() => groupByHorizon(filtered), [filtered]);
-  const todays = contacts.filter((contact) => contact.daysUntil === 0);
+  /* Grouped by the month the birthday actually falls in, starting from the
+     current month and wrapping — the order you'd read a calendar from today. */
+  const months = useMemo(() => {
+    const groups = new Map();
+    for (const contact of filtered) {
+      // Keyed on the occurrence: a Sept 1 birthday that has already gone by is
+      // September of NEXT year, and belongs at the end of the year, not above
+      // tomorrow's.
+      const key = `${contact.nextBirthdayYear}-${contact.birthMonth}`;
+      const list = groups.get(key) ?? [];
+      list.push(contact);
+      groups.set(key, list);
+    }
+    return [...groups.values()]
+      .map((list) => {
+        const sorted = list.sort((a, b) => a.daysUntil - b.daysUntil || a.name.localeCompare(b.name));
+        return {
+          key: `${sorted[0].nextBirthdayYear}-${sorted[0].birthMonth}`,
+          month: sorted[0].birthMonth,
+          year: sorted[0].nextBirthdayYear,
+          contacts: sorted,
+          order: sorted[0].daysUntil,
+        };
+      })
+      .sort((a, b) => a.order - b.order);
+  }, [filtered]);
+
   const next = contacts[0];
+  const todaysPeople = contacts.filter((c) => c.daysUntil === 0);
 
   async function handleDelete(contact) {
     if (!window.confirm(`Remove ${contact.name}?`)) return;
@@ -55,59 +89,67 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-2xl px-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6">
-      <header className="flex items-center justify-between gap-3 py-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-ink text-paper">
-            <Icon name="cake" className="size-5" />
-          </span>
-          <div>
-            <h1 className="text-lg font-semibold leading-none tracking-tight">Birthday Bot</h1>
-            <p className="mt-1 text-xs text-muted">
-              {contacts.length} {contacts.length === 1 ? "birthday" : "birthdays"} tracked
-            </p>
-          </div>
+    <div className="mx-auto w-full max-w-xl px-5 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-7">
+      <header className="flex items-baseline justify-between gap-4">
+        <h1 className="font-display text-[26px] leading-none tracking-tight">Birthdays</h1>
+        <div className="flex items-center gap-3">
+          <span className="text-[13px] tabular-nums text-faint">{contacts.length}</span>
+          <button
+            onClick={() => setDialog("notifications")}
+            className="relative -mr-1.5 rounded-full p-1.5 text-muted transition hover:text-ink"
+            aria-label="Notification settings"
+          >
+            <Icon name={pushOn ? "bell" : "bellOff"} className="size-[18px]" />
+            {pushOn ? (
+              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-accent" />
+            ) : null}
+          </button>
         </div>
-
-        <button
-          onClick={() => setDialog("notifications")}
-          className="relative rounded-full border border-line p-2.5 text-ink transition hover:bg-accent-soft"
-          aria-label="Notification settings"
-        >
-          <Icon name={pushOn ? "bell" : "bellOff"} className="size-5" />
-          {pushOn ? (
-            <span className="absolute right-2 top-2 size-1.5 rounded-full bg-accent" aria-hidden="true" />
-          ) : null}
-        </button>
       </header>
 
-      {todays.length > 0 ? (
-        <section className="mt-2 rounded-2xl border border-accent/40 bg-accent-soft px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-accent">Today</p>
-          <p className="mt-1.5 text-[17px] font-medium leading-snug text-ink">
-            {todays
-              .map((c) => (c.turningAge != null ? `${c.name} turns ${c.turningAge}` : `${c.name}'s birthday`))
+      {today && contacts.length > 0 ? (
+        <div className="rise mt-5">
+          <YearMeridian contacts={contacts} today={today} />
+        </div>
+      ) : null}
+
+      {/* The one thing you opened the app to find out. */}
+      {todaysPeople.length > 0 ? (
+        <section className="rise rise-1 mt-7">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">Today</p>
+          <p className="mt-2 font-display text-[34px] leading-[1.1] tracking-tight text-ink">
+            {todaysPeople.map((c) => c.name).join(", ")}
+          </p>
+          <p className="mt-1.5 text-sm text-muted">
+            {todaysPeople
+              .map((c) => (c.turningAge != null ? `turns ${c.turningAge}` : "age unknown"))
               .join(" · ")}
           </p>
         </section>
       ) : next ? (
-        <section className="mt-2 rounded-2xl border border-line bg-card px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Up next</p>
-          <p className="mt-1.5 text-[17px] font-medium leading-snug text-ink">
-            {next.name} · {monthDay(next)}
+        <section className="rise rise-1 mt-7">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-faint">
+            {countdown(next.daysUntil)}
           </p>
-          <p className="mt-0.5 text-sm text-muted">
-            {countdown(next.daysUntil)} · {turningLabel(next)}
+          <p className="mt-2 font-display text-[34px] leading-[1.1] tracking-tight text-ink">
+            {next.name}
+          </p>
+          <p className="mt-1.5 text-sm text-muted">
+            {monthDay(next)}
+            {next.turningAge != null ? ` · turns ${next.turningAge}` : ""}
           </p>
         </section>
       ) : null}
 
-      <div className="sticky top-0 z-20 -mx-4 mt-5 bg-paper px-4 pb-3 pt-1 sm:-mx-6 sm:px-6">
+      <div className="rise rise-2 sticky top-0 z-20 -mx-5 mt-7 bg-ground px-5 pb-3 pt-2 sm:-mx-7 sm:px-7">
         <div className="relative">
-          <Icon name="search" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+          <Icon
+            name="search"
+            className="pointer-events-none absolute left-0 top-1/2 size-4 -translate-y-1/2 text-faint"
+          />
           <input
-            className={`${inputClass} pl-10`}
-            placeholder="Search names, dates, notes"
+            className={inputClass}
+            placeholder="Search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             type="search"
@@ -115,32 +157,40 @@ export default function App() {
         </div>
       </div>
 
-      {error ? <div className="mb-4"><Banner tone="error" onDismiss={() => setError(null)}>{error}</Banner></div> : null}
+      {error ? (
+        <div className="mb-4">
+          <Banner tone="error" onDismiss={() => setError(null)}>{error}</Banner>
+        </div>
+      ) : null}
 
-      <main className="pb-6">
+      <main className="pb-8">
         {loading ? (
-          <p className="py-12 text-center text-sm text-muted">Loading…</p>
+          <p className="py-16 text-center text-sm text-faint">Loading…</p>
         ) : contacts.length === 0 ? (
-          <EmptyState icon="cake" title="No birthdays yet">
-            Add someone by hand, or import a CSV/JSON export to fill the list in one go.
+          <EmptyState icon="calendar" title="No birthdays yet">
+            Add someone, or import a CSV export to fill the year in one go.
           </EmptyState>
         ) : filtered.length === 0 ? (
           <EmptyState icon="search" title="Nothing matches">
             No one here matches “{query}”.
           </EmptyState>
         ) : (
-          <div className="space-y-6">
-            {groups.map((group) => (
-              <section key={group.key}>
-                <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
-                  {group.label}
-                  <span className="ml-2 font-normal normal-case tracking-normal opacity-70">
-                    {group.contacts.length}
-                  </span>
-                </h2>
-                <ul className="space-y-2">
-                  {group.contacts.map((contact) => (
-                    <ContactCard
+          <div>
+            {months.map(({ key, month, year, contacts: list }) => (
+              <section key={key} className="mt-7 first:mt-2">
+                <div className="flex items-baseline gap-3">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                    {MONTHS[month - 1]}
+                    {today && year !== today.year ? (
+                      <span className="ml-1.5 font-normal tracking-normal text-faint">{year}</span>
+                    ) : null}
+                  </h2>
+                  <span className="h-px flex-1 bg-line" />
+                  <span className="text-[11px] tabular-nums text-faint">{list.length}</span>
+                </div>
+                <ul className="mt-1 divide-y divide-line">
+                  {list.map((contact) => (
+                    <ContactRow
                       key={contact.id}
                       contact={contact}
                       onEdit={(target) => { setEditing(target); setDialog("edit"); }}
@@ -154,16 +204,13 @@ export default function App() {
         )}
       </main>
 
-      {/*
-        Fixed, not sticky: inside an installed web app a sticky bar can fail to
-        resolve its containing block's height and strand itself mid-screen.
-        No backdrop-blur either — a blurred fixed bar detaches during iOS
-        momentum scrolling.
-      */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-4 pb-[env(safe-area-inset-bottom)] sm:px-6">
-        <div className="mx-auto flex max-w-2xl items-center justify-center gap-2 py-3">
+      {/* Fixed, not sticky: inside an installed web app a sticky bar can fail to
+          resolve its containing block and strand itself mid-screen. No blur —
+          a blurred fixed bar detaches during iOS momentum scrolling. */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto flex max-w-xl items-center gap-2 px-5 py-3 sm:px-7">
           <Button variant="accent" icon="plus" onClick={() => { setEditing(null); setDialog("add"); }}>
-            Add birthday
+            Add
           </Button>
           <Button variant="outline" icon="upload" onClick={() => setDialog("import")}>
             Import
@@ -183,13 +230,8 @@ export default function App() {
         />
       ) : null}
 
-      {dialog === "import" ? (
-        <ImportPanel onClose={() => setDialog(null)} onImported={load} />
-      ) : null}
-
-      {dialog === "notifications" ? (
-        <NotificationSettings onClose={() => setDialog(null)} />
-      ) : null}
+      {dialog === "import" ? <ImportPanel onClose={() => setDialog(null)} onImported={load} /> : null}
+      {dialog === "notifications" ? <NotificationSettings onClose={() => setDialog(null)} /> : null}
     </div>
   );
 }
