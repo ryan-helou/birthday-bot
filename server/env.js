@@ -44,6 +44,16 @@ export const env = {
   },
 };
 
+/**
+ * The passcode, read live rather than snapshotted.
+ *
+ * Unset (the default) means no gate at all — the app behaves exactly as it did
+ * before. Reading it on each call keeps the gate honest under test, where an app
+ * is booted more than once in one process and a captured value would be stale;
+ * in production the variable never changes at runtime, so behaviour is identical.
+ */
+export const currentPasscode = () => optional("APP_PASSCODE");
+
 /** Whether both VAPID variables are present. Whether they are USABLE is decided
  *  in server/lib/push.js, which validates them without letting a bad pair crash
  *  the process — import `pushConfigured` from there, not from here. */

@@ -5,7 +5,7 @@ import { countdown, turningLabel } from "../lib/format.js";
  * A row, not a card. Border and fill are spent only on the day itself, so the
  * one row that matters is the one that looks different.
  */
-export function ContactRow({ contact, onEdit, onDelete }) {
+export function ContactRow({ contact, onEdit, onDelete, passed }) {
   const isToday = contact.daysUntil === 0;
 
   // The day is in the left column and the month is the section heading, so the
@@ -41,7 +41,7 @@ export function ContactRow({ contact, onEdit, onDelete }) {
       <span
         className={`shrink-0 text-[13px] tabular-nums ${isToday ? "text-accent" : "text-faint"}`}
       >
-        {countdown(contact.daysUntil)}
+        {passed ? (passed === 1 ? "yesterday" : `${passed} days ago`) : countdown(contact.daysUntil)}
       </span>
 
       {/* Controls stay out of the way until the row is touched or focused. */}

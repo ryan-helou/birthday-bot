@@ -132,9 +132,20 @@ records array, and dates parse from `1999-03-14`, `03/14/1999`, `14/03/1999`,
 | `GET` | `/api/runs` | The last 14 daily runs, for debugging a missed morning. |
 | `POST` | `/api/runs/today` | Run today's job now. `?force=1` bypasses the once-a-day guard. |
 
-**There is no authentication.** This is built as a single-user personal app on a
-private URL. Before sharing the URL, put something in front of it — the smallest
-version is an `Authorization` check in one middleware in `server/index.js`.
+### Locking it
+
+By default there is no authentication: anyone with the URL sees the list. Set
+`APP_PASSCODE` and the whole app goes behind one passcode, entered once per
+device and remembered for 180 days:
+
+```bash
+railway variables --service birthday-bot --set "APP_PASSCODE=your-passcode"
+```
+
+The session cookie is an HMAC of its own expiry keyed on the passcode, so there
+is no session store, and changing the passcode signs every device out. The health
+check stays open so Railway can still probe it. Unset the variable and the gate
+disappears entirely.
 
 ## Layout
 
@@ -148,6 +159,7 @@ server/
   lib/dates.js              Civil-date maths, birthday parsing — the timezone core
   lib/push.js               web-push setup, fan-out, pruning, notification copy
   lib/import-parser.js      CSV/JSON reading, loose column matching
+  auth.js                   The optional passcode gate (off unless APP_PASSCODE)
   routes/                   contacts · subscriptions · import · system
   jobs/birthday-job.js      The 08:00 cron job, its once-a-day guard and boot catch-up
 client/
@@ -158,7 +170,7 @@ client/
 scripts/
   generate-icons.mjs        Every icon slot, drawn from one vector definition
   stamp-sw.mjs              Stamps the service worker's build id
-tests/                      43 tests — unit, HTTP integration, and push delivery
+tests/                      47 tests — unit, HTTP integration, push delivery, auth
 ```
 
 ## Notes on the parts that are easy to get wrong
