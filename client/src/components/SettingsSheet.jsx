@@ -4,7 +4,7 @@ import { disablePush, enablePush, getExistingSubscription, iosNeedsInstall, push
 import { Banner, Button, Modal } from "./ui.jsx";
 import { Icon } from "./Icon.jsx";
 
-export function NotificationSettings({ onClose }) {
+export function SettingsSheet({ onClose, onImport }) {
   const [subscribed, setSubscribed] = useState(false);
   const [devices, setDevices] = useState([]);
   const [health, setHealth] = useState(null);
@@ -68,7 +68,7 @@ export function NotificationSettings({ onClose }) {
   }
 
   return (
-    <Modal title="Notifications" onClose={onClose}>
+    <Modal title="Settings" onClose={onClose}>
       <div className="space-y-4">
         <div className="flex items-start gap-3 rounded-xl border border-line bg-paper px-4 py-3.5">
           <Icon name={subscribed ? "bell" : "bellOff"} className={`mt-0.5 size-5 ${subscribed ? "text-accent" : "text-muted"}`} />
@@ -111,6 +111,18 @@ export function NotificationSettings({ onClose }) {
           </Button>
           <Button variant="outline" onClick={sendTest} disabled={busy || devices.length === 0}>
             Send a test
+          </Button>
+        </div>
+
+        <div className="border-t border-line pt-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+            Add in bulk
+          </p>
+          <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
+            Import a CSV or JSON export. A birthday with no year is fine.
+          </p>
+          <Button variant="outline" icon="upload" className="mt-3" onClick={onImport}>
+            Import a file
           </Button>
         </div>
 
