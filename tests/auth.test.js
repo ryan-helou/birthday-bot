@@ -90,6 +90,28 @@ dbTest("a forged or altered cookie is refused", async () => {
   } finally { app.close(); }
 });
 
+dbTest("guessing is rate limited, so a public lock cannot be brute-forced", async () => {
+  const app = await boot({ passcode: "hunter2" });
+  try {
+    let sawLimit = false;
+    for (let i = 0; i < 12; i += 1) {
+      const res = await app.call("/api/session", {
+        method: "POST", body: JSON.stringify({ passcode: `wrong-${i}` }),
+      });
+      if (res.status === 429) { sawLimit = true; break; }
+      assert.equal(res.status, 401, `attempt ${i} should be a plain rejection`);
+    }
+    assert.ok(sawLimit, "repeated wrong guesses must start returning 429");
+
+    // The correct passcode is refused too while the window is open — otherwise
+    // the limit would only slow down an attacker who guesses wrong forever.
+    const blocked = await app.call("/api/session", {
+      method: "POST", body: JSON.stringify({ passcode: "hunter2" }),
+    });
+    assert.equal(blocked.status, 429);
+  } finally { app.close(); }
+});
+
 dbTest("a cookie minted under a different passcode stops working", async () => {
   const first = await boot({ passcode: "hunter2" });
   let cookie;

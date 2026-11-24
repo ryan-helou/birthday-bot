@@ -47,6 +47,43 @@ function readCookie(req) {
 /** Public routes: the health check, and the passcode exchange itself. */
 const OPEN = new Set(["/api/health", "/api/session"]);
 
+/*
+ * Rate limit on guessing.
+ *
+ * The lock sits on a public URL, so without this a passcode is only as strong
+ * as how fast someone can POST. Ten wrong answers per address per 15 minutes
+ * turns even a short passcode into something not worth attacking. In memory on
+ * purpose: one process, and a restart clearing the counters is not a weakness
+ * worth a table for.
+ */
+const WINDOW_MS = 15 * 60 * 1000;
+const MAX_ATTEMPTS = 10;
+
+/** Per-app counters. Owned by the instance, not the module, so two apps in one
+ *  process (which is what the tests do) cannot lock each other out. */
+function createLimiter() {
+  const attempts = new Map(); // ip -> { count, resetAt }
+
+  return {
+    blocked(ip) {
+      const seen = attempts.get(ip);
+      return Boolean(seen) && Date.now() <= seen.resetAt && seen.count >= MAX_ATTEMPTS;
+    },
+    fail(ip) {
+      const now = Date.now();
+      const seen = attempts.get(ip);
+      if (!seen || now > seen.resetAt) attempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+      else seen.count += 1;
+
+      // Keep the map from growing without bound on a long-lived process.
+      if (attempts.size > 5000) {
+        for (const [key, value] of attempts) if (now > value.resetAt) attempts.delete(key);
+      }
+    },
+    clear: (ip) => attempts.delete(ip),
+  };
+}
+
 export function passcodeGate(req, res, next) {
   if (!currentPasscode()) return next();
   if (OPEN.has(req.path)) return next();
@@ -60,6 +97,8 @@ export function passcodeGate(req, res, next) {
 }
 
 export function sessionRoutes(app) {
+  const limiter = createLimiter();
+
   app.get("/api/session", (req, res) => {
     const passcode = currentPasscode();
     res.json({ required: Boolean(passcode), signedIn: !passcode || verify(readCookie(req)) });
@@ -69,11 +108,20 @@ export function sessionRoutes(app) {
     const passcode = currentPasscode();
     if (!passcode) return res.json({ signedIn: true });
 
+    const ip = req.ip ?? "unknown";
+    if (limiter.blocked(ip)) {
+      return res.status(429).json({ error: "Too many tries. Wait 15 minutes and try again." });
+    }
+
     const given = String(req.body?.passcode ?? "");
     const a = Buffer.from(given, "utf8");
     const b = Buffer.from(passcode, "utf8");
     const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
-    if (!ok) return res.status(401).json({ error: "That passcode doesn't match." });
+    if (!ok) {
+      limiter.fail(ip);
+      return res.status(401).json({ error: "That passcode doesn't match." });
+    }
+    limiter.clear(ip);
 
     const expiresAt = Date.now() + MAX_AGE_DAYS * 86400_000;
     res.setHeader(

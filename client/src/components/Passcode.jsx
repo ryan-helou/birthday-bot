@@ -34,9 +34,12 @@ export function Passcode({ onUnlocked }) {
           Enter the passcode. This device stays signed in.
         </p>
         <input
-          className={`${fieldClass} mt-5 text-center tracking-[0.3em]`}
+          className={`${fieldClass} mt-5 text-center`}
           type="password"
-          inputMode="numeric"
+          autoComplete="current-password"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck="false"
           autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
