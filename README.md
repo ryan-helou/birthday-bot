@@ -2,7 +2,7 @@
 
 # Birthday Bot
 
-**A simple app that keeps track of birthdays and sends a phone notification at 8:00 in the morning on the day.**
+**An app that keeps track of birthdays and sends a phone notification at 8:00 in the morning on the day.**
 
 <!-- facts --><img alt="Sends at: 8:00 am" src="https://img.shields.io/badge/Sends_at-8:00_am-24292f?style=for-the-badge"> <img alt="Imports: CSV or JSON" src="https://img.shields.io/badge/Imports-CSV_or_JSON-24292f?style=for-the-badge"> <img alt="Feb 29: reminded Feb 28" src="https://img.shields.io/badge/Feb_29-reminded_Feb_28-24292f?style=for-the-badge">
 
